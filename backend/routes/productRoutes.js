@@ -1,24 +1,24 @@
 const express = require("express");
 const router = express.Router();
-const Product = require("../models/Product");
+const Product = require("../models/product");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
-// ✅ Cloudinary config
+// ✅ Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// ✅ Multer storage via Cloudinary
+// ✅ Configure Multer-Storage-Cloudinary
 const storage = new CloudinaryStorage({
-  cloudinary,
+  cloudinary: cloudinary,
   params: {
-    folder: "king-antiques",
-    allowed_formats: ["jpg", "jpeg", "png", "webp"],
-  },
+    folder: "king-antiques",      // change to any folder name you like
+    allowed_formats: ["jpg", "jpeg", "png", "webp"]
+  }
 });
 
 const upload = multer({ storage });
@@ -35,7 +35,8 @@ router.post("/", upload.single("image"), async (req, res) => {
       price: req.body.price,
       description: req.body.description,
       type: req.body.type,
-      image: req.file ? req.file.path : "", // ✅ This is the Cloudinary URL
+      image: req.file ? req.file.path : "",
+      imagePublicId: req.file ? req.file.filename : ""
     });
 
     const saved = await newProduct.save();
@@ -52,7 +53,7 @@ router.get("/", async (req, res) => {
   res.json(products);
 });
 
-// ✅ Get single product by ID (for edit)
+// ✅ Get single product by ID
 router.get("/:id", async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -66,21 +67,35 @@ router.get("/:id", async (req, res) => {
 // ✅ Update product
 router.put("/:id", upload.single("image"), async (req, res) => {
   try {
-    const updateData = {
-      name: req.body.name,
-      code: req.body.code,
-      price: req.body.price,
-      description: req.body.description,
-      type: req.body.type,
-    };
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
 
+    let imageUrl = product.image;
+    let imagePublicId = product.imagePublicId;
+
+    // If new image uploaded → replace old Cloudinary image
     if (req.file) {
-      updateData.image = req.file.path; // ✅ Cloudinary URL
+      // delete old image from Cloudinary
+      if (product.imagePublicId) {
+        await cloudinary.uploader.destroy(product.imagePublicId);
+      }
+      imageUrl = req.file.path;
+      imagePublicId = req.file.filename;
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id,
-      updateData,
+      {
+        name: req.body.name,
+        code: req.body.code,
+        price: req.body.price,
+        description: req.body.description,
+        type: req.body.type,
+        image: imageUrl,
+        imagePublicId: imagePublicId
+      },
       { new: true }
     );
 
@@ -94,6 +109,16 @@ router.put("/:id", upload.single("image"), async (req, res) => {
 // ✅ Delete product
 router.delete("/:id", async (req, res) => {
   try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // ✅ Delete the image from Cloudinary
+    if (product.imagePublicId) {
+      await cloudinary.uploader.destroy(product.imagePublicId);
+    }
+
     await Product.findByIdAndDelete(req.params.id);
     res.json({ message: "Deleted" });
   } catch (e) {
