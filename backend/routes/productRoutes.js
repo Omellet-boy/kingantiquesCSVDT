@@ -2,16 +2,23 @@ const express = require("express");
 const router = express.Router();
 const Product = require("../models/Product");
 const multer = require("multer");
-const path = require("path");
+const cloudinary = require("cloudinary").v2;
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
-// ✅ Multer config
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "../../uploads"));
+// ✅ Cloudinary config
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// ✅ Multer storage via Cloudinary
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "king-antiques",
+    allowed_formats: ["jpg", "jpeg", "png", "webp"],
   },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname));
-  }
 });
 
 const upload = multer({ storage });
@@ -28,7 +35,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       price: req.body.price,
       description: req.body.description,
       type: req.body.type,
-      image: req.file ? "/uploads/" + req.file.filename : ""
+      image: req.file ? req.file.path : "", // ✅ This is the Cloudinary URL
     });
 
     const saved = await newProduct.save();
@@ -63,11 +70,12 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       name: req.body.name,
       code: req.body.code,
       price: req.body.price,
-      description: req.body.description
+      description: req.body.description,
+      type: req.body.type,
     };
 
     if (req.file) {
-      updateData.image = "/uploads/" + req.file.filename;
+      updateData.image = req.file.path; // ✅ Cloudinary URL
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(
