@@ -1,9 +1,8 @@
+require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
-
-// ✅ Import secrets directly from config.js
 const { MONGO_URI } = require("./config");
 
 const app = express();
@@ -11,10 +10,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ✅ Serve static HTML files from frontend folder
+// Serve frontend (optional for now)
 app.use(express.static(path.join(__dirname, "../frontend")));
-// ✅ Serve static files from uploads folder
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+// ✅ Remove this if you no longer want local uploads
+// app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected"))
@@ -22,10 +22,11 @@ mongoose.connect(MONGO_URI)
 
 const productRoutes = require("./routes/productRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const uploadRoutes = require("./routes/uploadRoutes");
 
 app.use("/api/products", productRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/upload", uploadRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
-
